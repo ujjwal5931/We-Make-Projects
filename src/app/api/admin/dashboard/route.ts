@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
       revenueResult,
       recentOrders,
       ordersByStatus,
-      revenueByDay,
+      revenueLast7DaysOrders,
     ] = await Promise.all([
       prisma.order.count(),
       prisma.order.count({ where: { status: { in: ["PAYMENT_SUBMITTED", "UNDER_REVIEW"] } } }),
@@ -50,18 +50,37 @@ export async function GET(request: NextRequest) {
         by: ["status"],
         _count: { status: true },
       }),
-      // Revenue last 7 days — SQLite compatible
-      prisma.$queryRaw<{ date: string; revenue: number }[]>`
-        SELECT 
-          strftime('%Y-%m-%d', createdAt) as date,
-          CAST(SUM(totalAmount) AS REAL) as revenue
-        FROM orders
-        WHERE status IN ('PAYMENT_APPROVED', 'DELIVERED')
-          AND createdAt >= datetime('now', '-7 days')
-        GROUP BY strftime('%Y-%m-%d', createdAt)
-        ORDER BY date ASC
-      `,
+      // Fetch orders for the last 7 days to calculate daily revenue
+      prisma.order.findMany({
+        where: {
+          status: { in: ["PAYMENT_APPROVED", "DELIVERED"] },
+          createdAt: {
+            gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
+          },
+        },
+        select: {
+          createdAt: true,
+          totalAmount: true,
+        },
+      }),
     ]);
+
+    // Aggregate revenue by date (YYYY-MM-DD)
+    const dayMap = new Map<string, number>();
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(Date.now() - i * 24 * 60 * 60 * 1000);
+      dayMap.set(d.toISOString().slice(0, 10), 0);
+    }
+    for (const order of revenueLast7DaysOrders) {
+      const day = new Date(order.createdAt).toISOString().slice(0, 10);
+      if (dayMap.has(day)) {
+        dayMap.set(day, (dayMap.get(day) || 0) + Number(order.totalAmount));
+      }
+    }
+    const revenueByDay = Array.from(dayMap.entries()).map(([date, revenue]) => ({
+      date,
+      revenue,
+    }));
 
     return NextResponse.json({
       stats: {

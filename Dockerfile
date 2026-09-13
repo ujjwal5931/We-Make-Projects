@@ -39,8 +39,9 @@ RUN groupadd --system --gid 1001 nodejs
 RUN useradd --system --uid 1001 -g nodejs nextjs
 
 # Create uploads directory and set permissions
-RUN mkdir -p /app/uploads/screenshots /app/uploads/products /app/prisma && \
+RUN mkdir -p /app/uploads/screenshots /app/uploads/products /app/public/uploads/products /app/public/uploads/qr /app/prisma && \
     chown -R nextjs:nodejs /app
+
 
 # Copy built application & dependencies with nextjs ownership
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public

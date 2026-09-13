@@ -40,7 +40,9 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# local sqlite db & uploads
+# local sqlite db & private uploads
 prisma/*.db
 prisma/*.db-journal
-uploads/
+/uploads/
+!/public/uploads/
+
