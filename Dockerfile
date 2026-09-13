@@ -17,6 +17,8 @@ COPY . .
 
 # Generate Prisma Client with all binary targets & Build Next.js
 ENV NEXT_TELEMETRY_DISABLED=1
+ENV AUTH_TRUST_HOST=true
+ENV DATABASE_URL="postgresql://postgres:postgres@localhost:5432/we_make_projects"
 RUN npx prisma generate
 RUN npm run build
 
@@ -28,6 +30,7 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3000
 ENV NEXT_TELEMETRY_DISABLED=1
+ENV AUTH_TRUST_HOST=true
 
 # Install OpenSSL in runner for Prisma runtime
 RUN apt-get update -y && apt-get install -y openssl ca-certificates && rm -rf /var/lib/apt/lists/*
