@@ -2,6 +2,9 @@ import { Navbar } from "@/components/store/navbar";
 import { Footer } from "@/components/store/footer";
 import { Toaster } from "@/components/ui/sonner";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export default function StoreLayout({
   children,
 }: {

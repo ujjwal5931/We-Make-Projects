@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 
@@ -30,5 +31,10 @@ export async function PATCH(request: NextRequest) {
     )
   );
   await prisma.adminAuditLog.create({ data: { adminId: (session.user as any).id, action: "SETTINGS_UPDATED", entityType: "StoreSettings", entityId: "global", metadata: JSON.stringify(body) } });
+  
+  // Invalidate layout and page caches so the updated contact info reflects immediately in Footer and all pages
+  revalidatePath("/", "layout");
+
   return NextResponse.json({ success: true });
 }
+
