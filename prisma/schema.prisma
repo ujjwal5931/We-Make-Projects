@@ -1,0 +1,312 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// PostgreSQL: String fields store JSON-encoded arrays for features, requirements, whatsIncluded, tags
+
+
+model User {
+  id            String   @id @default(cuid())
+  userId        String   @unique
+  passwordHash  String
+  name          String
+  email         String   @unique
+  phone         String?
+  role          String   @default("CUSTOMER") // "CUSTOMER" | "ADMIN"
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  billingAddress BillingAddress?
+
+  cart           Cart?
+  orders         Order[]
+  reviews        Review[]
+  approvedOrders Order[]         @relation("ApprovedByAdmin")
+  auditLogs      AdminAuditLog[] @relation("AdminLogs")
+
+  @@map("users")
+}
+
+model BillingAddress {
+  id           String  @id @default(cuid())
+  userId       String  @unique
+  fullName     String
+  addressLine1 String
+  addressLine2 String?
+  city         String
+  state        String
+  postalCode   String
+  country      String  @default("India")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("billing_addresses")
+}
+
+model Category {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  slug        String   @unique
+  description String?
+  image       String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  products Product[]
+
+  @@map("categories")
+}
+
+model Product {
+  id               String   @id @default(cuid())
+  name             String
+  slug             String   @unique
+  description      String
+  shortDescription String?
+  price            Decimal
+  discountPrice    Decimal?
+  thumbnail        String?
+  categoryId       String
+  fileType         String?
+  fileSize         String?
+  numberOfPages    Int?
+  previewUrl       String?
+  features         String?  // JSON-encoded String[]
+  requirements     String?  // JSON-encoded String[]
+  whatsIncluded    String?  // JSON-encoded String[]
+  tags             String?  // JSON-encoded String[]
+  isActive         Boolean  @default(true)
+  isFeatured       Boolean  @default(false)
+  salesCount       Int      @default(0)
+  digitalFileKey      String?
+  digitalFileProvider String?
+  downloadLimit    Int?
+  expiresInDays    Int?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  category       Category          @relation(fields: [categoryId], references: [id])
+  images         ProductImage[]
+  paymentQR      ProductPaymentQR?
+  cartItems      CartItem[]
+  orderItems     OrderItem[]
+  reviews        Review[]
+  downloadTokens DownloadToken[]
+
+  @@map("products")
+}
+
+model ProductImage {
+  id        String  @id @default(cuid())
+  productId String
+  imageUrl  String
+  altText   String?
+  sortOrder Int     @default(0)
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@map("product_images")
+}
+
+model PaymentQR {
+  id          String   @id @default(cuid())
+  name        String
+  qrImageUrl  String
+  upiId       String
+  accountName String
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  productQRs ProductPaymentQR[]
+  payments   Payment[]
+
+  @@map("payment_qrs")
+}
+
+model ProductPaymentQR {
+  id        String @id @default(cuid())
+  productId String @unique
+  qrId      String
+
+  product Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  qr      PaymentQR @relation(fields: [qrId], references: [id])
+
+  @@map("product_payment_qrs")
+}
+
+model Cart {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user  User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items CartItem[]
+
+  @@map("carts")
+}
+
+model CartItem {
+  id        String @id @default(cuid())
+  cartId    String
+  productId String
+  quantity  Int    @default(1)
+
+  cart    Cart    @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([cartId, productId])
+  @@map("cart_items")
+}
+
+model Order {
+  id          String  @id @default(cuid())
+  orderNumber String  @unique
+  userId      String
+  subtotal    Decimal
+  discount    Decimal @default(0)
+  totalAmount Decimal
+  status      String  @default("PENDING_PAYMENT") // OrderStatus values as String
+
+  customerNameSnapshot  String
+  customerEmailSnapshot String
+  customerPhoneSnapshot String?
+
+  billingFullName     String?
+  billingAddressLine1 String?
+  billingAddressLine2 String?
+  billingCity         String?
+  billingState        String?
+  billingPostalCode   String?
+  billingCountry      String?
+
+  paymentSubmittedAt DateTime?
+  paymentApprovedAt  DateTime?
+  paymentRejectedAt  DateTime?
+  rejectionReason    String?
+
+  approvedByAdminId String?
+
+  deliveryEmailSentAt  DateTime?
+  deliveryEmailStatus  String?
+  deliveryEmailError   String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user           User            @relation(fields: [userId], references: [id])
+  approvedBy     User?           @relation("ApprovedByAdmin", fields: [approvedByAdminId], references: [id])
+  items          OrderItem[]
+  payment        Payment?
+  downloadTokens DownloadToken[]
+
+  @@map("orders")
+}
+
+model OrderItem {
+  id        String  @id @default(cuid())
+  orderId   String
+  productId String?
+
+  productNameSnapshot   String
+  productSlugSnapshot   String
+  unitPriceSnapshot     Decimal
+  discountPriceSnapshot Decimal?
+  finalPriceSnapshot    Decimal
+  quantity              Int      @default(1)
+  categorySnapshot      String?
+
+  order   Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  @@map("order_items")
+}
+
+model Payment {
+  id                String   @id @default(cuid())
+  orderId           String   @unique
+  expectedAmount    Decimal
+  utrReference      String   @unique
+  screenshotUrl     String?
+  paymentQRId       String?
+  status            String   @default("PENDING") // PaymentStatus values as String
+  submittedAt       DateTime?
+  verifiedAt        DateTime?
+  verifiedByAdminId String?
+  rejectionReason   String?
+  notes             String?
+
+  order     Order      @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  paymentQR PaymentQR? @relation(fields: [paymentQRId], references: [id])
+
+  @@map("payments")
+}
+
+model Review {
+  id        String   @id @default(cuid())
+  productId String
+  userId    String
+  orderId   String?
+  rating    Int
+  title     String
+  comment   String
+  isVisible Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, productId])
+  @@map("reviews")
+}
+
+model DownloadToken {
+  id            String    @id @default(cuid())
+  orderId       String
+  productId     String
+  token         String    @unique @default(cuid())
+  isActive      Boolean   @default(true)
+  expiresAt     DateTime?
+  downloadLimit Int?
+  downloadCount Int       @default(0)
+  createdAt     DateTime  @default(now())
+  lastUsedAt    DateTime?
+
+  order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@map("download_tokens")
+}
+
+model AdminAuditLog {
+  id         String   @id @default(cuid())
+  adminId    String
+  action     String
+  entityType String?
+  entityId   String?
+  metadata   String?  // JSON-encoded (was Json?)
+  ipAddress  String?
+  createdAt  DateTime @default(now())
+
+  admin User @relation("AdminLogs", fields: [adminId], references: [id])
+
+  @@map("admin_audit_logs")
+}
+
+model StoreSettings {
+  id          String  @id @default(cuid())
+  key         String  @unique
+  value       String
+  description String?
+
+  @@map("store_settings")
+}
